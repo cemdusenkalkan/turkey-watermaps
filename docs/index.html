@@ -153,16 +153,26 @@
             const v = props[field];
             const color = riskColor(v);
 
-            // Debug logging (only log occasionally to avoid spam)
-            if (Math.random() < 0.01) { // Log 1% of tiles
+            // Debug logging
+            if (Math.random() < 0.1) { // Log 10% of tiles
                 console.log(`🎨 Styling tile: ${field}=${v} → color=${color}`, props);
+                console.log('Available fields:', Object.keys(props));
+            }
+
+            // TEST: Force all tiles to be visible with different colors based on data presence
+            let testColor = '#ff0000'; // Red = no data
+            if (v !== undefined && v !== null && !isNaN(v)) {
+                testColor = '#00ff00'; // Green = has data
+                if (v > 2) testColor = '#0000ff'; // Blue = high values
             }
 
             return {
                 fill: true,
-                fillColor: color,
-                fillOpacity: 0.75,
-                weight: 0
+                fillColor: testColor,
+                fillOpacity: 0.9, // Very visible
+                weight: 2, // Thick border
+                color: '#000000', // Black border
+                opacity: 1.0
             };
         }
 
@@ -176,6 +186,17 @@
             minZoom: 4,
             zIndex: 10
         }).addTo(map);
+
+        // Test: Force show first few tiles with bright red
+        let tileCount = 0;
+        catchmentLayer.on('tileload', function(e) {
+            tileCount++;
+            if (tileCount <= 3) { // Force first 3 tiles to be bright red for testing
+                console.log(`🔴 TEST: Forcing tile ${tileCount} to red`);
+                // This won't work with vectorGrid, but let's add a visual marker
+                document.getElementById('status').innerHTML = `🟥 TEST MODE: ${tileCount} tiles loaded (forcing red)`;
+            }
+        });
 
         // Debug: Log when tiles load
         catchmentLayer.on('load', function() {
