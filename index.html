@@ -107,17 +107,27 @@
             return "#bd0026"; // extremely high
         }
 
+        const TILE_LAYER_ID = "aqueduct_baseline_annual_tr_web"; // from metadata.json
         let selectedMetric = "bws";
+
+        function metricField() {
+            return selectedMetric + "_score";
+        }
+
+        function styleForProps(props) {
+            const v = props[metricField()];
+            return {
+                fill: true,
+                fillColor: riskColor(v),
+                fillOpacity: 0.75,
+                weight: 0
+            };
+        }
 
         // Vector tile layer for catchments (main risk layer)
         const catchmentLayer = L.vectorGrid.protobuf("tiles_catchments/{z}/{x}/{y}.pbf", {
             vectorTileLayerStyles: {
-                aqueduct_baseline_annual_tr_web: props => ({
-                    fill: true,
-                    fillColor: riskColor(props[selectedMetric + "_score"]),
-                    fillOpacity: 0.75,
-                    weight: 0
-                })
+                [TILE_LAYER_ID]: props => styleForProps(props)
             },
             interactive: true,
             maxZoom: 12,
@@ -192,14 +202,7 @@
             selectedMetric = e.target.value;
             // Update the vector tile layer style dynamically
             catchmentLayer.setStyle({
-                vectorTileLayerStyles: {
-                    aqueduct_baseline_annual_tr_web: props => ({
-                        fill: true,
-                        fillColor: riskColor(props[selectedMetric + "_score"]),
-                        fillOpacity: 0.75,
-                        weight: 0
-                    })
-                }
+                [TILE_LAYER_ID]: props => styleForProps(props)
             });
         });
 
