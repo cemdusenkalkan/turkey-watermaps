@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turkey Water Risk Atlas</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-width: 200px;
+        }
+
+        #controls h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        select, button {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .legend {
+            background: white;
+            padding: 10px;
+            line-height: 18px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .legend i {
+            width: 18px;
+            height: 12px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.8;
+        }
+
+        .prov-label {
+            background: none;
+            border: none;
+            color: #444;
+            font-weight: 600;
+            text-shadow: 0 0 4px #fff;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h3>Water Risk Metrics</h3>
+        <select id="metricSelect">
+            <option value="bws">Baseline Water Stress</option>
+            <option value="iav">Interannual Variability</option>
+            <option value="sev">Seasonal Variability</option>
+            <option value="gtd">Groundwater Table Decline</option>
+            <option value="drr">Drought Risk</option>
+        </select>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.bundled.js"></script>
+
+    <script>
+        // Initialize map with Turkey bounds
+        const turkeyBounds = L.latLngBounds([35, 25], [43, 46]); // SW to NE
+        const map = L.map('map').fitBounds(turkeyBounds);
+
+        // Base map (neutral, desaturated)
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+            maxZoom: 12,
+            attribution: '&copy; CARTO'
+        }).addTo(map);
+
+        // Risk color function (WRI 5-class palette)
+        function riskColor(value) {
+            if (value == null || isNaN(value)) return "#f7f7f7";
+            if (value < 1) return "#ffffcc"; // low
+            if (value < 2) return "#ffeda0"; // low-medium
+            if (value < 3) return "#feb24c"; // medium-high
+            if (value < 4) return "#f03b20"; // high
+            return "#bd0026"; // extremely high
+        }
+
+        let selectedMetric = "bws";
+
+        // Vector tile layer for catchments (main risk layer)
+        const catchmentLayer = L.vectorGrid.protobuf("tiles_catchments/{z}/{x}/{y}.pbf", {
+            vectorTileLayerStyles: {
+                aqueduct_baseline_annual_tr_web: props => ({
+                    fill: true,
+                    fillColor: riskColor(props[selectedMetric + "_score"]),
+                    fillOpacity: 0.75,
+                    weight: 0
+                })
+            },
+            interactive: true,
+            maxZoom: 12,
+            zIndex: 10
+        }).addTo(map);
+
+        // Rivers layer (zoom-controlled)
+        let riversLayer;
+        fetch("data_web/hydrorivers_tr_web_final.geojson")
+            .then(r => r.json())
+            .then(geo => {
+                riversLayer = L.geoJSON(geo, {
+                    style: function(feature) {
+                        const ord = feature.properties.ORD_STRA || 1;
+                        return {
+                            color: "#1f78b4",
+                            weight: ord >= 6 ? 1.2 : ord >= 4 ? 0.8 : 0.4,
+                            opacity: 0.5
+                        };
+                    }
+                });
+
+                // Add to map if already zoomed in
+                if (map.getZoom() >= 7) {
+                    map.addLayer(riversLayer);
+                }
+            })
+            .catch(err => console.warn("Failed to load rivers:", err));
+
+        // Lakes layer
+        let lakesLayer;
+        fetch("data_web/hydrolakes_tr_web.geojson")
+            .then(r => r.json())
+            .then(geo => {
+                lakesLayer = L.geoJSON(geo, {
+                    style: { color: "#6baed6", weight: 0.5, fillOpacity: 0.8 }
+                }).addTo(map);
+            })
+            .catch(err => console.warn("Failed to load lakes:", err));
+
+        // Province labels
+        fetch("data_web/turkey_provinces_web.geojson")
+            .then(r => r.json())
+            .then(geo => {
+                L.geoJSON(geo, {
+                    style: { color: "#999", weight: 0.8, fillOpacity: 0 },
+                    onEachFeature: (f, layer) => {
+                        layer.bindTooltip(f.properties.name, {
+                            permanent: false,
+                            direction: "center",
+                            className: "prov-label"
+                        });
+                    }
+                }).addTo(map);
+            })
+            .catch(err => console.warn("Failed to load provinces:", err));
+
+        // Zoom control for rivers
+        map.on("zoomend", () => {
+            const z = map.getZoom();
+            if (riversLayer) {
+                if (z >= 7) {
+                    if (!map.hasLayer(riversLayer)) map.addLayer(riversLayer);
+                } else {
+                    if (map.hasLayer(riversLayer)) map.removeLayer(riversLayer);
+                }
+            }
+        });
+
+        // Metric selector
+        document.getElementById("metricSelect").addEventListener("change", (e) => {
+            selectedMetric = e.target.value;
+            // Update the vector tile layer style dynamically
+            catchmentLayer.setStyle({
+                vectorTileLayerStyles: {
+                    aqueduct_baseline_annual_tr_web: props => ({
+                        fill: true,
+                        fillColor: riskColor(props[selectedMetric + "_score"]),
+                        fillOpacity: 0.75,
+                        weight: 0
+                    })
+                }
+            });
+        });
+
+        // Popup for catchment details
+        catchmentLayer.on("click", function (e) {
+            const p = e.layer.properties;
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent(
+                    `<div style="font-size: 12px; line-height: 1.4;">
+                        <b>Catchment ${p.aqid}</b><br>
+                        <strong>Baseline Water Stress:</strong> ${p.bws_score ? p.bws_score.toFixed(2) : 'N/A'}<br>
+                        <strong>Interannual Variability:</strong> ${p.iav_score ? p.iav_score.toFixed(2) : 'N/A'}<br>
+                        <strong>Seasonal Variability:</strong> ${p.sev_score ? p.sev_score.toFixed(2) : 'N/A'}<br>
+                        <strong>Groundwater Decline:</strong> ${p.gtd_score ? p.gtd_score.toFixed(2) : 'N/A'}<br>
+                        <strong>Drought Risk:</strong> ${p.drr_score ? p.drr_score.toFixed(2) : 'N/A'}
+                    </div>`
+                )
+                .openOn(map);
+        });
+
+        // Layer controls (add after all layers are loaded)
+        setTimeout(() => {
+            const overlays = {
+                "Water Risk Catchments": catchmentLayer,
+                "Rivers (zoom ≥7)": riversLayer,
+                "Lakes": lakesLayer
+            };
+            L.control.layers(null, overlays, { collapsed: true }).addTo(map);
+        }, 2000); // Wait for layers to load
+
+        // Legend
+        const legend = L.control({ position: "bottomright" });
+        legend.onAdd = function () {
+            const div = L.DomUtil.create("div", "legend");
+            const grades = [0, 1, 2, 3, 4];
+            const labels = ["Low", "Low–Med", "Med–High", "High", "Extremely High"];
+
+            for (let i = 0; i < grades.length; i++) {
+                div.innerHTML +=
+                    `<i style="background:${riskColor(grades[i])}"></i> ${labels[i]}<br>`;
+            }
+
+            return div;
+        };
+        legend.addTo(map);
+    </script>
+</body>
+</html>
