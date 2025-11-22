@@ -71,17 +71,30 @@
 </head>
 <body>
     <div id="controls">
-        <h3>Water Risk Metrics</h3>
-        <div id="status" style="font-size: 12px; margin: 5px 0; padding: 5px; background: #f0f0f0; border-radius: 3px;">
+        <h3>Turkey Water Risk Atlas</h3>
+        <div id="status" style="font-size: 11px; margin: 5px 0; padding: 5px; background: #f0f0f0; border-radius: 3px;">
             Loading map data...
         </div>
-        <select id="metricSelect">
-            <option value="bws">Baseline Water Stress</option>
-            <option value="iav">Interannual Variability</option>
-            <option value="sev">Seasonal Variability</option>
-            <option value="gtd">Groundwater Table Decline</option>
-            <option value="drr">Drought Risk</option>
-        </select>
+
+        <div style="margin: 10px 0;">
+            <label style="font-size: 12px; font-weight: bold;">Water Risk Metric:</label><br>
+            <select id="metricSelect" style="margin-top: 3px;">
+                <option value="bws">Baseline Water Stress</option>
+                <option value="iav">Interannual Variability</option>
+                <option value="sev">Seasonal Variability</option>
+                <option value="gtd">Groundwater Table Decline</option>
+                <option value="drr">Drought Risk</option>
+            </select>
+        </div>
+
+        <div style="margin: 10px 0;">
+            <label style="font-size: 12px; font-weight: bold;">Basemap:</label><br>
+            <select id="basemapSelect" style="margin-top: 3px;">
+                <option value="osm">OpenStreetMap (Detailed)</option>
+                <option value="carto">CARTO (Clean)</option>
+                <option value="satellite">Satellite</option>
+            </select>
+        </div>
     </div>
 
     <div id="map"></div>
@@ -92,13 +105,31 @@
     <script>
         // Initialize map with Turkey bounds
         const turkeyBounds = L.latLngBounds([35, 25], [43, 46]); // SW to NE
-        const map = L.map('map').fitBounds(turkeyBounds);
+        const map = L.map('map', {
+            center: [39, 35.5],
+            zoom: 6,
+            maxZoom: 18,
+            minZoom: 5
+        });
 
-        // Base map (neutral, desaturated)
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-            maxZoom: 10,
-            attribution: '&copy; CARTO'
-        }).addTo(map);
+        // Basemap layers
+        const basemaps = {
+            osm: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 18,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }),
+            carto: L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+                maxZoom: 18,
+                attribution: '&copy; CARTO'
+            }),
+            satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+                maxZoom: 18,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            })
+        };
+
+        // Start with OpenStreetMap (detailed)
+        let currentBasemap = basemaps.osm.addTo(map);
 
         // Risk color function (WRI 5-class palette)
         function riskColor(value) {
@@ -142,6 +173,7 @@
             },
             interactive: true,
             maxZoom: 10,
+            minZoom: 4,
             zIndex: 10
         }).addTo(map);
 
@@ -197,12 +229,19 @@
             })
             .catch(err => console.warn("Failed to load lakes:", err));
 
-        // Province labels
+        // Province boundaries with labels
         fetch("data_web/turkey_provinces_web.geojson")
             .then(r => r.json())
             .then(geo => {
                 L.geoJSON(geo, {
-                    style: { color: "#999", weight: 0.8, fillOpacity: 0 },
+                    style: function(feature) {
+                        return {
+                            color: "#666",
+                            weight: 1.5,
+                            fillOpacity: 0,
+                            dashArray: '5, 5'
+                        };
+                    },
                     onEachFeature: (f, layer) => {
                         layer.bindTooltip(f.properties.name, {
                             permanent: false,
@@ -239,6 +278,20 @@
             console.log('✅ Style updated for catchment layer');
         });
 
+        // Basemap selector
+        document.getElementById("basemapSelect").addEventListener("change", (e) => {
+            const selectedBasemap = e.target.value;
+            console.log(`🗺️ Switching to basemap: ${selectedBasemap}`);
+
+            // Remove current basemap
+            map.removeLayer(currentBasemap);
+
+            // Add new basemap
+            currentBasemap = basemaps[selectedBasemap].addTo(map);
+
+            console.log('✅ Basemap switched');
+        });
+
         // Popup for catchment details
         catchmentLayer.on("click", function (e) {
             const p = e.layer.properties;
@@ -260,19 +313,33 @@
         // Layer controls (add after all layers are loaded)
         setTimeout(() => {
             const overlays = {
-                "Water Risk Catchments": catchmentLayer,
-                "Rivers (zoom ≥7)": riversLayer,
-                "Lakes": lakesLayer
+                "🟦 Water Risk Catchments": catchmentLayer,
+                "🌊 Rivers (zoom ≥7)": riversLayer,
+                "🏞️ Lakes": lakesLayer
             };
-            L.control.layers(null, overlays, { collapsed: true }).addTo(map);
+
+            const baseLayers = {
+                "🗺️ OpenStreetMap (Detailed)": basemaps.osm,
+                "📊 CARTO (Clean)": basemaps.carto,
+                "🛰️ Satellite": basemaps.satellite
+            };
+
+            L.control.layers(baseLayers, overlays, {
+                collapsed: true,
+                position: 'topright'
+            }).addTo(map);
         }, 2000); // Wait for layers to load
+
+        // Scale bar
+        L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
 
         // Legend
         const legend = L.control({ position: "bottomright" });
         legend.onAdd = function () {
             const div = L.DomUtil.create("div", "legend");
+            div.innerHTML = '<h4 style="margin: 0 0 8px 0; font-size: 14px;">Water Risk Level</h4>';
             const grades = [0, 1, 2, 3, 4];
-            const labels = ["Low", "Low–Med", "Med–High", "High", "Extremely High"];
+            const labels = ["Low (0-1)", "Low–Med (1-2)", "Med–High (2-3)", "High (3-4)", "Extremely High (4-5)"];
 
             for (let i = 0; i < grades.length; i++) {
                 div.innerHTML +=
