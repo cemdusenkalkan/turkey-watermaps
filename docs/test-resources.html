@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turkey Water Risk Atlas - Resource Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .progress { margin: 10px 0; }
+        .summary { font-weight: bold; font-size: 18px; margin: 20px 0; }
+        button { padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #005a8b; }
+        .details { margin-top: 10px; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Turkey Water Risk Atlas - Resource Verification Test</h1>
+    <p>This test verifies that all required resources for the water risk map are accessible.</p>
+
+    <button onclick="runAllTests()">🔍 Run All Tests</button>
+
+    <div id="summary" class="summary"></div>
+
+    <div class="test-section">
+        <h3>📁 Core Files Test</h3>
+        <div id="coreFilesStatus">Not tested yet</div>
+        <div id="coreFilesDetails" class="details"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>🗺️ GeoJSON Files Test</h3>
+        <div id="geoJsonStatus">Not tested yet</div>
+        <div id="geoJsonDetails" class="details"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>🧩 Vector Tiles Test (Sample)</h3>
+        <div id="tilesStatus">Not tested yet</div>
+        <div id="tilesDetails" class="details"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📊 Metadata Test</h3>
+        <div id="metadataStatus">Not tested yet</div>
+        <div id="metadataDetails" class="details"></div>
+    </div>
+
+    <script>
+        let totalTests = 0;
+        let passedTests = 0;
+        let failedTests = 0;
+
+        async function testResource(url, description) {
+            totalTests++;
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                if (response.ok) {
+                    passedTests++;
+                    return { status: 'success', message: `${description}: ✅ OK (${response.status})` };
+                } else {
+                    failedTests++;
+                    return { status: 'error', message: `${description}: ❌ Failed (${response.status})` };
+                }
+            } catch (error) {
+                failedTests++;
+                return { status: 'error', message: `${description}: ❌ Error - ${error.message}` };
+            }
+        }
+
+        async function testCoreFiles() {
+            const coreFiles = [
+                { url: 'index.html', desc: 'Main HTML file' },
+                { url: 'tiles_catchments/metadata.json', desc: 'Tiles metadata' }
+            ];
+
+            const results = await Promise.all(coreFiles.map(file =>
+                testResource(file.url, file.desc)
+            ));
+
+            const statusDiv = document.getElementById('coreFilesStatus');
+            const detailsDiv = document.getElementById('coreFilesDetails');
+
+            const allPassed = results.every(r => r.status === 'success');
+            statusDiv.innerHTML = allPassed ? '✅ All core files accessible' : '❌ Some core files missing';
+            statusDiv.className = allPassed ? 'success' : 'error';
+
+            detailsDiv.innerHTML = results.map(r => `<div class="${r.status}">${r.message}</div>`).join('');
+        }
+
+        async function testGeoJsonFiles() {
+            const geoJsonFiles = [
+                'data_web/turkey_provinces_web.geojson',
+                'data_web/hydrorivers_tr_web_final.geojson',
+                'data_web/hydrolakes_tr_web.geojson'
+            ];
+
+            const results = await Promise.all(geoJsonFiles.map(url =>
+                testResource(url, url.split('/').pop())
+            ));
+
+            const statusDiv = document.getElementById('geoJsonStatus');
+            const detailsDiv = document.getElementById('geoJsonDetails');
+
+            const allPassed = results.every(r => r.status === 'success');
+            statusDiv.innerHTML = allPassed ? '✅ All GeoJSON files accessible' : '❌ Some GeoJSON files missing';
+            statusDiv.className = allPassed ? 'success' : 'error';
+
+            detailsDiv.innerHTML = results.map(r => `<div class="${r.status}">${r.message}</div>`).join('');
+        }
+
+        async function testSampleTiles() {
+            // Test a few representative tiles from different zoom levels
+            const sampleTiles = [
+                'tiles_catchments/4/10/6.pbf',     // Low zoom
+                'tiles_catchments/6/36/23.pbf',    // Medium zoom
+                'tiles_catchments/8/146/95.pbf',   // Higher zoom
+                'tiles_catchments/10/604/401.pbf'  // High zoom
+            ];
+
+            const results = await Promise.all(sampleTiles.map(url =>
+                testResource(url, `Tile ${url.split('/').slice(-3).join('/')}`)
+            ));
+
+            const statusDiv = document.getElementById('tilesStatus');
+            const detailsDiv = document.getElementById('tilesDetails');
+
+            const passedCount = results.filter(r => r.status === 'success').length;
+            const totalCount = results.length;
+
+            if (passedCount === totalCount) {
+                statusDiv.innerHTML = `✅ All ${totalCount} sample tiles accessible`;
+                statusDiv.className = 'success';
+            } else if (passedCount > 0) {
+                statusDiv.innerHTML = `⚠️ ${passedCount}/${totalCount} sample tiles accessible`;
+                statusDiv.className = 'warning';
+            } else {
+                statusDiv.innerHTML = `❌ No sample tiles accessible`;
+                statusDiv.className = 'error';
+            }
+
+            detailsDiv.innerHTML = results.map(r => `<div class="${r.status}">${r.message}</div>`).join('');
+        }
+
+        async function testMetadata() {
+            try {
+                const response = await fetch('tiles_catchments/metadata.json');
+                const metadata = await response.json();
+
+                const statusDiv = document.getElementById('metadataStatus');
+                const detailsDiv = document.getElementById('metadataDetails');
+
+                // Check if metadata has expected structure
+                const checks = [
+                    { test: metadata.name, desc: 'Has name field' },
+                    { test: metadata.format === 'pbf', desc: 'Correct format (pbf)' },
+                    { test: metadata.minzoom === 4 && metadata.maxzoom === 10, desc: 'Correct zoom levels (4-10)' },
+                    { test: metadata.vector_layers && metadata.vector_layers.length > 0, desc: 'Has vector layers' },
+                    { test: metadata.vector_layers[0].id === 'aqueduct_baseline_annual_tr_web', desc: 'Correct layer ID' }
+                ];
+
+                const passedChecks = checks.filter(c => c.test).length;
+                const totalChecks = checks.length;
+
+                if (passedChecks === totalChecks) {
+                    statusDiv.innerHTML = '✅ Metadata structure valid';
+                    statusDiv.className = 'success';
+                } else {
+                    statusDiv.innerHTML = `⚠️ Metadata issues (${passedChecks}/${totalChecks} checks passed)`;
+                    statusDiv.className = 'warning';
+                }
+
+                detailsDiv.innerHTML = checks.map(c =>
+                    `<div class="${c.test ? 'success' : 'error'}">${c.test ? '✅' : '❌'} ${c.desc}</div>`
+                ).join('');
+
+                totalTests++;
+                if (passedChecks === totalChecks) passedTests++;
+                else failedTests++;
+
+            } catch (error) {
+                document.getElementById('metadataStatus').innerHTML = '❌ Metadata fetch failed';
+                document.getElementById('metadataStatus').className = 'error';
+                document.getElementById('metadataDetails').innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                totalTests++;
+                failedTests++;
+            }
+        }
+
+        async function runAllTests() {
+            // Reset counters
+            totalTests = 0;
+            passedTests = 0;
+            failedTests = 0;
+
+            document.getElementById('summary').innerHTML = '⏳ Running tests...';
+
+            // Run all test suites
+            await Promise.all([
+                testCoreFiles(),
+                testGeoJsonFiles(),
+                testSampleTiles(),
+                testMetadata()
+            ]);
+
+            // Update summary
+            const summaryDiv = document.getElementById('summary');
+            const successRate = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
+
+            if (failedTests === 0) {
+                summaryDiv.innerHTML = `🎉 All tests passed! (${passedTests}/${totalTests}) - 100% success rate`;
+                summaryDiv.className = 'success';
+            } else if (successRate >= 80) {
+                summaryDiv.innerHTML = `⚠️ Most tests passed (${passedTests}/${totalTests}) - ${successRate}% success rate`;
+                summaryDiv.className = 'warning';
+            } else {
+                summaryDiv.innerHTML = `❌ Many tests failed (${passedTests}/${totalTests}) - ${successRate}% success rate`;
+                summaryDiv.className = 'error';
+            }
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 500);
+        });
+    </script>
+</body>
+</html>
