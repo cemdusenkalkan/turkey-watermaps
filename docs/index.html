@@ -96,7 +96,7 @@
 
         // Base map (neutral, desaturated)
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-            maxZoom: 12,
+            maxZoom: 10,
             attribution: '&copy; CARTO'
         }).addTo(map);
 
@@ -141,7 +141,7 @@
                 [TILE_LAYER_ID]: props => styleForProps(props)
             },
             interactive: true,
-            maxZoom: 12,
+            maxZoom: 10,
             zIndex: 10
         }).addTo(map);
 
