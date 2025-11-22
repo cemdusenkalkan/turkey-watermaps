@@ -6,9 +6,15 @@ Tests that all required files are accessible and properly formatted.
 
 import os
 import json
-import requests
 from pathlib import Path
 import sys
+
+# Optional: requests for web server testing
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
 
 def test_local_files():
     """Test that all required files exist locally in docs/"""
@@ -44,25 +50,39 @@ def test_metadata_structure():
         with open('docs/tiles_catchments/metadata.json', 'r') as f:
             metadata = json.load(f)
 
-        checks = [
+        # Check basic metadata fields
+        basic_checks = [
             ('name' in metadata, "Has name field"),
             (metadata.get('format') == 'pbf', "Format is 'pbf'"),
-            (metadata.get('minzoom') == 4, f"Min zoom is 4 (got {metadata.get('minzoom')})"),
-            (metadata.get('maxzoom') == 10, f"Max zoom is 10 (got {metadata.get('maxzoom')})"),
-            ('vector_layers' in metadata and len(metadata['vector_layers']) > 0, "Has vector layers"),
-            (metadata.get('vector_layers', [{}])[0].get('id') == 'aqueduct_baseline_annual_tr_web',
-             f"Correct layer ID (got {metadata.get('vector_layers', [{}])[0].get('id')})")
+            (int(metadata.get('minzoom', 0)) == 4, f"Min zoom is 4 (got {metadata.get('minzoom')})"),
+            (int(metadata.get('maxzoom', 0)) == 10, f"Max zoom is 10 (got {metadata.get('maxzoom')})")
         ]
 
+        # Check vector layers from the embedded JSON string
+        vector_layers = None
+        if 'json' in metadata:
+            try:
+                json_data = json.loads(metadata['json'])
+                vector_layers = json_data.get('vector_layers', [])
+            except:
+                pass
+
+        layer_checks = [
+            (vector_layers is not None and len(vector_layers) > 0, "Has vector layers in JSON"),
+            (vector_layers and vector_layers[0].get('id') == 'aqueduct_baseline_annual_tr_web',
+             f"Correct layer ID (got {vector_layers[0].get('id') if vector_layers else 'None'})")
+        ]
+
+        all_checks = basic_checks + layer_checks
         passed = 0
-        for check, description in checks:
+        for check, description in all_checks:
             if check:
                 print(f"   ✅ {description}")
                 passed += 1
             else:
                 print(f"   ❌ {description}")
 
-        return passed == len(checks)
+        return passed == len(all_checks)
 
     except Exception as e:
         print(f"❌ Error reading metadata: {e}")
@@ -150,6 +170,10 @@ def count_tiles():
 
 def test_web_server(base_url="http://localhost:8000"):
     """Test that web server is responding (optional)"""
+    if not HAS_REQUESTS:
+        print("\n🌐 Web server test skipped (install requests: pip install requests)")
+        return None
+
     print(f"\n🌐 Testing web server at {base_url}...")
 
     try:
