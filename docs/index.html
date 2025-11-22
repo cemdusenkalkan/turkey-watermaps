@@ -72,6 +72,9 @@
 <body>
     <div id="controls">
         <h3>Water Risk Metrics</h3>
+        <div id="status" style="font-size: 12px; margin: 5px 0; padding: 5px; background: #f0f0f0; border-radius: 3px;">
+            Loading map data...
+        </div>
         <select id="metricSelect">
             <option value="bws">Baseline Water Stress</option>
             <option value="iav">Interannual Variability</option>
@@ -115,10 +118,18 @@
         }
 
         function styleForProps(props) {
-            const v = props[metricField()];
+            const field = metricField();
+            const v = props[field];
+            const color = riskColor(v);
+
+            // Debug logging (only log occasionally to avoid spam)
+            if (Math.random() < 0.01) { // Log 1% of tiles
+                console.log(`🎨 Styling tile: ${field}=${v} → color=${color}`, props);
+            }
+
             return {
                 fill: true,
-                fillColor: riskColor(v),
+                fillColor: color,
                 fillOpacity: 0.75,
                 weight: 0
             };
@@ -134,11 +145,26 @@
             zIndex: 10
         }).addTo(map);
 
+        // Debug: Log when tiles load
+        catchmentLayer.on('load', function() {
+            console.log('✅ Vector tiles loaded successfully');
+            document.getElementById('status').innerHTML = '🗺️ Risk map loaded - try changing metrics!';
+            document.getElementById('status').style.background = '#d4edda';
+        });
+
+        catchmentLayer.on('tileerror', function(e) {
+            console.error('❌ Tile error:', e);
+            document.getElementById('status').innerHTML = '❌ Error loading tiles: ' + e.error.message;
+            document.getElementById('status').style.background = '#f8d7da';
+        });
+
         // Rivers layer (zoom-controlled)
         let riversLayer;
+        console.log('🌊 Loading rivers data...');
         fetch("data_web/hydrorivers_tr_web_final.geojson")
             .then(r => r.json())
             .then(geo => {
+                console.log(`✅ Rivers loaded: ${geo.features.length} features`);
                 riversLayer = L.geoJSON(geo, {
                     style: function(feature) {
                         const ord = feature.properties.ORD_STRA || 1;
@@ -155,7 +181,10 @@
                     map.addLayer(riversLayer);
                 }
             })
-            .catch(err => console.warn("Failed to load rivers:", err));
+            .catch(err => {
+                console.warn("Failed to load rivers:", err);
+                document.getElementById('status').innerHTML = '⚠️ Rivers failed to load';
+            });
 
         // Lakes layer
         let lakesLayer;
@@ -200,10 +229,14 @@
         // Metric selector
         document.getElementById("metricSelect").addEventListener("change", (e) => {
             selectedMetric = e.target.value;
+            console.log(`🔄 Metric changed to: ${selectedMetric} (field: ${metricField()})`);
+
             // Update the vector tile layer style dynamically
             catchmentLayer.setStyle({
                 [TILE_LAYER_ID]: props => styleForProps(props)
             });
+
+            console.log('✅ Style updated for catchment layer');
         });
 
         // Popup for catchment details
