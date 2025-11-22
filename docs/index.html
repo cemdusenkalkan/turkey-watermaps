@@ -176,7 +176,36 @@
             };
         }
 
-        // Vector tile layer for catchments (main risk layer)
+        // TEST: Load GeoJSON instead of tiles to prove styling works
+        let catchmentLayer = null;
+        fetch("data_web/test_catchments.geojson")
+            .then(r => r.json())
+            .then(geo => {
+                console.log('✅ Test GeoJSON loaded:', geo.features.length, 'features');
+                catchmentLayer = L.geoJSON(geo, {
+                    style: f => styleForProps(f.properties),
+                    onEachFeature: (f, layer) => {
+                        const p = f.properties;
+                        layer.bindPopup(
+                            `<b>${p.name}</b><br>
+                             BWS: ${p.bws_score?.toFixed(2)}<br>
+                             IAV: ${p.iav_score?.toFixed(2)}<br>
+                             SEV: ${p.sev_score?.toFixed(2)}`
+                        );
+                    }
+                }).addTo(map);
+                console.log('✅ Test catchments added to map');
+                document.getElementById('status').innerHTML = '🧪 TEST MODE: GeoJSON loaded - you should see colored squares!';
+                document.getElementById('status').style.background = '#d4edda';
+            })
+            .catch(err => {
+                console.error('❌ Failed to load test GeoJSON:', err);
+                document.getElementById('status').innerHTML = '❌ Test GeoJSON failed to load';
+                document.getElementById('status').style.background = '#f8d7da';
+            });
+
+        // Keep vector tiles commented out for now
+        /*
         const catchmentLayer = L.vectorGrid.protobuf("tiles_catchments/{z}/{x}/{y}.pbf", {
             vectorTileLayerStyles: {
                 [TILE_LAYER_ID]: props => styleForProps(props)
@@ -186,30 +215,9 @@
             minZoom: 4,
             zIndex: 10
         }).addTo(map);
+        */
 
-        // Test: Force show first few tiles with bright red
-        let tileCount = 0;
-        catchmentLayer.on('tileload', function(e) {
-            tileCount++;
-            if (tileCount <= 3) { // Force first 3 tiles to be bright red for testing
-                console.log(`🔴 TEST: Forcing tile ${tileCount} to red`);
-                // This won't work with vectorGrid, but let's add a visual marker
-                document.getElementById('status').innerHTML = `🟥 TEST MODE: ${tileCount} tiles loaded (forcing red)`;
-            }
-        });
-
-        // Debug: Log when tiles load
-        catchmentLayer.on('load', function() {
-            console.log('✅ Vector tiles loaded successfully');
-            document.getElementById('status').innerHTML = '🗺️ Risk map loaded - try changing metrics!';
-            document.getElementById('status').style.background = '#d4edda';
-        });
-
-        catchmentLayer.on('tileerror', function(e) {
-            console.error('❌ Tile error:', e);
-            document.getElementById('status').innerHTML = '❌ Error loading tiles: ' + e.error.message;
-            document.getElementById('status').style.background = '#f8d7da';
-        });
+        // Vector tiles commented out - using GeoJSON test instead
 
         // Rivers layer (zoom-controlled)
         let riversLayer;
@@ -291,12 +299,11 @@
             selectedMetric = e.target.value;
             console.log(`🔄 Metric changed to: ${selectedMetric} (field: ${metricField()})`);
 
-            // Update the vector tile layer style dynamically
-            catchmentLayer.setStyle({
-                [TILE_LAYER_ID]: props => styleForProps(props)
-            });
-
-            console.log('✅ Style updated for catchment layer');
+            // Update the GeoJSON layer style
+            if (catchmentLayer) {
+                catchmentLayer.setStyle(f => styleForProps(f.properties));
+                console.log('✅ GeoJSON style updated');
+            }
         });
 
         // Basemap selector
@@ -313,23 +320,7 @@
             console.log('✅ Basemap switched');
         });
 
-        // Popup for catchment details
-        catchmentLayer.on("click", function (e) {
-            const p = e.layer.properties;
-            L.popup()
-                .setLatLng(e.latlng)
-                .setContent(
-                    `<div style="font-size: 12px; line-height: 1.4;">
-                        <b>Catchment ${p.aqid}</b><br>
-                        <strong>Baseline Water Stress:</strong> ${p.bws_score ? p.bws_score.toFixed(2) : 'N/A'}<br>
-                        <strong>Interannual Variability:</strong> ${p.iav_score ? p.iav_score.toFixed(2) : 'N/A'}<br>
-                        <strong>Seasonal Variability:</strong> ${p.sev_score ? p.sev_score.toFixed(2) : 'N/A'}<br>
-                        <strong>Groundwater Decline:</strong> ${p.gtd_score ? p.gtd_score.toFixed(2) : 'N/A'}<br>
-                        <strong>Drought Risk:</strong> ${p.drr_score ? p.drr_score.toFixed(2) : 'N/A'}
-                    </div>`
-                )
-                .openOn(map);
-        });
+        // Popup for catchment details (GeoJSON popups are handled in layer creation above)
 
         // Layer controls (add after all layers are loaded)
         setTimeout(() => {

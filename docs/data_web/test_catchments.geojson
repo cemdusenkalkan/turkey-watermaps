@@ -1,0 +1,71 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "aqid": 1001,
+        "bws_score": 2.5,
+        "iav_score": 1.2,
+        "sev_score": 0.8,
+        "gtd_score": 1.0,
+        "drr_score": 2.8,
+        "name": "Test Catchment 1"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [35.0, 38.0],
+          [36.0, 38.0],
+          [36.0, 39.0],
+          [35.0, 39.0],
+          [35.0, 38.0]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "aqid": 1002,
+        "bws_score": 4.2,
+        "iav_score": 3.1,
+        "sev_score": 1.5,
+        "gtd_score": 0.5,
+        "drr_score": 4.1,
+        "name": "Test Catchment 2"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [37.0, 38.0],
+          [38.0, 38.0],
+          [38.0, 39.0],
+          [37.0, 39.0],
+          [37.0, 38.0]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "aqid": 1003,
+        "bws_score": 1.1,
+        "iav_score": 0.7,
+        "sev_score": 0.3,
+        "gtd_score": 0.8,
+        "drr_score": 1.4,
+        "name": "Test Catchment 3"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [39.0, 38.0],
+          [40.0, 38.0],
+          [40.0, 39.0],
+          [39.0, 39.0],
+          [39.0, 38.0]
+        ]]
+      }
+    }
+  ]
+}
